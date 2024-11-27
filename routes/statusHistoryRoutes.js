@@ -17,8 +17,8 @@ router.get('/', authMiddleware, async (req, res) => {
         let params = [];
 
         if (req.user.role === 'user') {
-            query += ' WHERE sh.tracking_number IN (SELECT tracking_number FROM packages WHERE sender_id = ?)';
-            params.push(req.user.id);
+            query += ' WHERE sh.tracking_number IN (SELECT tracking_number FROM packages WHERE sender_id = ? OR receiver_id = ?)';
+            params.push(req.user.id, req.user.id);
         }
 
         const [rows] = await db.execute(query, params);
@@ -33,11 +33,11 @@ router.post('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
     const { tracking_number, status_id, facility_id } = req.body;
 
     try {
-        await db.execute(
+        const [result] = await db.execute(
             'INSERT INTO status_history (tracking_number, status_id, facility_id, recorded_at) VALUES (?, ?, ?, NOW())',
             [tracking_number, status_id, facility_id]
         );
-        res.status(201).json({ message: 'Status history record added successfully' });
+        res.status(201).json({ message: 'Status history record added successfully', status_history_id: result.insertId });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -46,13 +46,14 @@ router.post('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
 // Обновление записи в истории (только admin)
 router.put('/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
     const { id } = req.params;
-    const updates = req.body;
+    const { tracking_number, status_id, facility_id } = req.body;
 
     try {
-        const updateKeys = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-        const updateValues = Object.values(updates);
+        await db.execute(
+            `UPDATE status_history SET tracking_number = ?, status_id = ?, facility_id = ? WHERE id = ?`,
+            [tracking_number, status_id, facility_id, id]
+        );
 
-        await db.execute(`UPDATE status_history SET ${updateKeys} WHERE id = ?`, [...updateValues, id]);
         res.json({ message: 'Status history record updated successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
