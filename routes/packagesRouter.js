@@ -6,7 +6,7 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 const router = express.Router();
 
 // Получение списка всех посылок (admin только)
-router.get('/', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
     try {
         const [rows] = await db.execute('SELECT * FROM packages WHERE is_deleted = 0');
         res.json(rows);
@@ -17,9 +17,19 @@ router.get('/', authMiddleware, roleMiddleware('admin'), async (req, res) => {
 
 // Получение посылок текущего пользователя (user)
 router.get('/my', authMiddleware, async (req, res) => {
+    const { status } = req.query;
+
     try {
-        const [rows] = await db.execute('SELECT * FROM packages WHERE sender_id = ? AND is_deleted = 0', [req.user.id]);
-        res.json(rows);
+        const [rows] = await db.execute('SELECT * FROM packages WHERE (sender_id = ? OR receiver_id = ?) AND is_deleted = 0', [req.user.id, req.user.id]);
+        let filteredRows = rows;
+
+        if(status) {
+            filteredRows = rows.filter(row => row.status === status);
+        }
+
+        const result = { rows: filteredRows };
+        
+        res.json(result);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
