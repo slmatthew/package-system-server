@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
     try {
         const [rows] = await db.execute('SELECT * FROM packages WHERE is_deleted = 0');
-        res.json(rows);
+        res.json({ result: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -27,9 +27,9 @@ router.get('/my', authMiddleware, async (req, res) => {
             filteredRows = rows.filter(row => row.status === status);
         }
 
-        const result = { rows: filteredRows };
+        const result = filteredRows;
         
-        res.json(result);
+        res.json({ result });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
