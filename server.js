@@ -2,17 +2,14 @@ require('dotenv').config();
 
 const express        = require('express');
 const bodyParser     = require('body-parser');
-const db             = require('./db');
-
-const authMiddleware = require('./middlewares/authMiddleware');
-const roleMiddleware = require('./middlewares/roleMiddleware');
+const db             = require('./helpers/databases');
 
 // Импорт маршрутов
-const userRoutes          = require('./routes/userRoutes');
-const packageRoutes       = require('./routes/packageRoutes');
-const packageTypeRoutes   = require('./routes/packageTypeRoutes');
-const packageStatusRoutes = require('./routes/packageStatusRoutes');
-const facilityRoutes      = require('./routes/facilityRoutes');
+const userRoutes          = require('./routes/usersRouter');
+const packageRoutes       = require('./routes/packagesRouter');
+const packageTypeRoutes   = require('./routes/packageTypesRoutes');
+const packageStatusRoutes = require('./routes/packageStatusesRoutes');
+const facilityRoutes      = require('./routes/facilitiesRoutes');
 const statusHistoryRoutes = require('./routes/statusHistoryRoutes');
 
 const app = express();

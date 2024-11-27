@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const db = require('../db');
+const db = require('../helpers/databases');
 const authMiddleware = require('../middlewares/authMiddleware');
 const roleMiddleware = require('../middlewares/roleMiddleware');
 
@@ -10,13 +10,15 @@ const router = express.Router();
 // Регистрация нового пользователя
 router.post('/register', async (req, res) => {
     const { username, password, first_name, last_name, address, role = 'user' } = req.body;
+    if(!username || !password || !first_name || !last_name || !address) return res.status(400).json({ error: 'Bad request"' });
+
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        await db.execute(
+        const [result] = await db.execute(
             'INSERT INTO users (username, password, first_name, last_name, address, role) VALUES (?, ?, ?, ?, ?, ?)',
             [username, hashedPassword, first_name, last_name, address, role]
         );
-        res.status(201).json({ message: 'User registered successfully' });
+        res.status(201).json({ message: 'User registered successfully', user_id: result.insertId });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -57,6 +59,8 @@ router.get('/refreshToken', authMiddleware, async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
+
+        res.json({ token });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -80,7 +84,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
     try {
         // Проверяем, если пользователь не админ, он может получить данные только о себе
-        if (userId !== currentUserId && userRole !== 'admin') {
+        if (userId != currentUserId && userRole !== 'admin') {
             return res.status(403).json({ error: 'Access denied. You can only view your own profile.' });
         }
 
@@ -98,7 +102,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
             last_name: user[0].last_name,
             username: user[0].username,
             address: user[0].address,
-            role: user[0].role
+            role: user[0].role,
+            is_current_user: user[0].id == req.user.id
         });
 
     } catch (err) {
@@ -109,7 +114,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // Обновление данных пользователя (только admin)
 router.put('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { role, ...updates } = req.body;
+    const { ...updates } = req.body;
 
     if(updates.hasOwnProperty('password')) return res.status(400).json({ error: 'Password cannot be updated through this endpoint. Use /password instead.' });
 
@@ -121,7 +126,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Invalid keys in the update request.' });
         }
         
-        if(req.user.role !== 'admin' && req.user.role !== role) {
+        if(req.user.role !== 'admin' && role && req.user.role !== updates.role) {
             return res.status(403).json({ error: 'You can not edit your role.' });
         }
         
@@ -141,12 +146,12 @@ router.patch('/password/:id', authMiddleware, async (req, res) => {
     const { old_password, new_password } = req.body;
 
     // Пароль может изменить либо сам пользователь, либо админ
-    if(userId !== req.user.id && req.user.role !== 'admin') {
+    if(userId != req.user.id && req.user.role !== 'admin') {
         return res.status(403).json({ error: 'You are not allowed to perform this action' });
     }
 
     if(!new_password || !old_password) {
-        return res.status(400).json({ error: 'New password is required.' });
+        return res.status(400).json({ error: 'Check fields' });
     }
 
     if(new_password.length < 6) {
@@ -162,14 +167,14 @@ router.patch('/password/:id', authMiddleware, async (req, res) => {
         }
 
         if(userId === req.user.id) {
-            const isMatch = await bcrypt.compare();
+            const isMatch = await bcrypt.compare(old_password, user.password);
             if(!isMatch) {
                 return res.status(401).json({ error: 'Old password is incorrect.' });
             }
         }
 
         // Хэшируем новый пароль
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const hashedPassword = await bcrypt.hash(new_password, 10);
 
         // Обновляем пароль в базе данных
         await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
