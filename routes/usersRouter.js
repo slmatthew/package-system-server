@@ -40,7 +40,7 @@ router.post('/login', async (req, res) => {
             { expiresIn: '1h' }
         );
 
-        res.json({ token });
+        res.json({ token, user: { id: user.id, role: user.role }});
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -78,9 +78,10 @@ router.get('/', authMiddleware, roleMiddleware('admin'), async (req, res) => {
 
 // Получение данных о пользователе по ID
 router.get('/:id', authMiddleware, async (req, res) => {
-    const userId = req.params.id;
     const currentUserId = req.user.id; // ID пользователя из токена
     const userRole = req.user.role; // Роль пользователя из токена
+
+    const userId = req.params.id == 'me' ? req.user.id : req.params.id;
 
     try {
         // Проверяем, если пользователь не админ, он может получить данные только о себе
