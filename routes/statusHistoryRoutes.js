@@ -22,11 +22,48 @@ router.get('/', authMiddleware, async (req, res) => {
         }
 
         const [rows] = await db.execute(query, params);
-        res.json(rows);
+        res.json({ result: rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
+router.get('/:tracking_number', authMiddleware, async (req, res) => {
+    try {
+        const { tracking_number } = req.params;
+
+        let query = `
+            SELECT sh.*, ps.value as status_value, f.name as facility_name, f.address as facility_address 
+            FROM status_history sh
+            JOIN package_statuses ps ON sh.status_id = ps.id
+            JOIN facilities f ON sh.facility_id = f.id
+            WHERE sh.tracking_number = ?
+        `;
+        let params = [tracking_number];
+
+        // Проверка прав доступа для пользователей
+        if (req.user.role === 'user') {
+            query += `
+                AND sh.tracking_number IN (
+                    SELECT tracking_number FROM packages 
+                    WHERE sender_id = ? OR receiver_id = ?
+                )
+            `;
+            params.push(req.user.id, req.user.id);
+        }
+
+        const [rows] = await db.execute(query, params);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No status history found for the provided tracking number.' });
+        }
+
+        res.json({ result: rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // Добавление записи в историю статусов (sorter, admin)
 router.post('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
