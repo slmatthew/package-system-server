@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express        = require('express');
 const bodyParser     = require('body-parser');
+const cors           = require('cors');
 const db             = require('./helpers/databases');
 
 // Импорт маршрутов
@@ -14,8 +15,9 @@ const statusHistoryRoutes = require('./routes/statusHistoryRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
 
-// Middleware для парсинга JSON
+app.use(cors());
 app.use(bodyParser.json());
 
 // Тест соединения с базой данных
@@ -41,6 +43,6 @@ app.use((req, res) => {
 });
 
 // Запуск сервера
-app.listen(PORT, () => {
+app.listen(PORT, HOSTNAME, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
