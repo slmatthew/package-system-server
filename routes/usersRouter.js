@@ -197,4 +197,15 @@ router.delete('/:id', authMiddleware, roleMiddleware('admin'), async (req, res) 
     }
 });
 
+// Удаление пользователя
+router.delete('/:id/permanent', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.execute('DELETE FROM users WHERE id = ?', [id]);
+        res.json({ message: 'User deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
