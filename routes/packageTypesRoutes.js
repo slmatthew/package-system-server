@@ -8,7 +8,7 @@ const router = express.Router();
 // Получение всех типов посылок (доступно всем пользователям)
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const [rows] = await db.execute('SELECT * FROM package_types');
+        const [rows] = await db.execute('SELECT * FROM package_types ORDER BY id ASC');
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });

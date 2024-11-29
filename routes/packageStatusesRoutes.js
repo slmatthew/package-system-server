@@ -8,7 +8,7 @@ const router = express.Router();
 // Получение всех статусов посылок (доступно всем пользователям)
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        const [rows] = await db.execute('SELECT * FROM package_statuses');
+        const [rows] = await db.execute('SELECT * FROM package_statuses ORDER BY id ASC');
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
