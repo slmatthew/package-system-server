@@ -6,10 +6,65 @@ const roleMiddleware = require('../middlewares/roleMiddleware');
 const router = express.Router();
 
 // Получение списка всех посылок (admin только)
-router.get('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
+// router.get('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
+//     try {
+//         const [rows] = await db.execute('SELECT * FROM packages WHERE is_deleted = 0');
+//         res.json({ result: rows });
+//     } catch (err) {
+//         res.status(500).json({ error: err.message });
+//     }
+// });
+
+router.get('/', authMiddleware, async (req, res) => {
+    const { search, type } = req.query;
+
     try {
-        const [rows] = await db.execute('SELECT * FROM packages WHERE is_deleted = 0');
-        res.json({ result: rows });
+        const query = `
+            SELECT 
+                p.*,
+                pt.value AS package_type,
+                CONCAT(sender.first_name, ' ', sender.last_name) AS sender_name,
+                CONCAT(receiver.first_name, ' ', receiver.last_name) AS receiver_name,
+                (SELECT ps.value 
+                FROM status_history sh
+                LEFT JOIN package_statuses ps ON sh.status_id = ps.id
+                WHERE sh.tracking_number = p.tracking_number
+                ORDER BY sh.recorded_at DESC
+                LIMIT 1) AS last_status,
+                (SELECT sh.recorded_at 
+                FROM status_history sh
+                WHERE sh.tracking_number = p.tracking_number
+                ORDER BY sh.recorded_at DESC
+                LIMIT 1) AS last_status_date,
+                (SELECT sh.status_id 
+                FROM status_history sh
+                WHERE sh.tracking_number = p.tracking_number
+                ORDER BY sh.recorded_at DESC
+                LIMIT 1) AS last_status_id
+            FROM packages p
+            LEFT JOIN users sender ON p.sender_id = sender.id
+            LEFT JOIN users receiver ON p.receiver_id = receiver.id
+            LEFT JOIN package_types pt ON p.type_id = pt.id
+            ORDER BY created_at DESC
+        `;
+
+        const [rows] = await db.execute(query, []);
+
+        // Фильтрация по статусу, если статус указан в запросе
+        let filteredRows = rows;
+        if (search) {
+            filteredRows = filteredRows.filter(row => {
+                return row.tracking_number === search ||
+                       row.sender_name === search ||
+                       row.receiver_name === search;
+            });
+        }
+
+        if(type) {
+            filteredRows = filteredRows.filter(row => row.type_id === type);
+        }
+
+        res.json({ result: filteredRows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -20,16 +75,44 @@ router.get('/my', authMiddleware, async (req, res) => {
     const { status } = req.query;
 
     try {
-        const [rows] = await db.execute('SELECT * FROM packages WHERE (sender_id = ? OR receiver_id = ?) AND is_deleted = 0', [req.user.id, req.user.id]);
-        let filteredRows = rows;
+        const query = `
+            SELECT 
+                p.*,
+                pt.value AS package_type,
+                CONCAT(sender.first_name, ' ', sender.last_name) AS sender_name,
+                CONCAT(receiver.first_name, ' ', receiver.last_name) AS receiver_name,
+                (SELECT ps.value 
+                FROM status_history sh
+                LEFT JOIN package_statuses ps ON sh.status_id = ps.id
+                WHERE sh.tracking_number = p.tracking_number
+                ORDER BY sh.recorded_at DESC
+                LIMIT 1) AS last_status,
+                (SELECT sh.recorded_at 
+                FROM status_history sh
+                WHERE sh.tracking_number = p.tracking_number
+                ORDER BY sh.recorded_at DESC
+                LIMIT 1) AS last_status_date,
+                (SELECT sh.status_id 
+                FROM status_history sh
+                WHERE sh.tracking_number = p.tracking_number
+                ORDER BY sh.recorded_at DESC
+                LIMIT 1) AS last_status_id
+            FROM packages p
+            LEFT JOIN users sender ON p.sender_id = sender.id
+            LEFT JOIN users receiver ON p.receiver_id = receiver.id
+            LEFT JOIN package_types pt ON p.type_id = pt.id
+            WHERE (p.sender_id = ? OR p.receiver_id = ?) AND p.is_deleted = 0
+        `;
 
-        if(status) {
-            filteredRows = rows.filter(row => row.status === status);
+        const [rows] = await db.execute(query, [req.user.id, req.user.id]);
+
+        // Фильтрация по статусу, если статус указан в запросе
+        let filteredRows = rows;
+        if (status) {
+            filteredRows = rows.filter(row => row.last_status === status);
         }
 
-        const result = filteredRows;
-        
-        res.json({ result });
+        res.json({ result: filteredRows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -57,11 +140,21 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // Обновление информации о посылке (только admin, sorter)
 router.put('/:tracking_number', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
-    const { tracking_number } = req.params;
+    const allowedFields = [
+        'sender_id', 'receiver_id', 'type_id', 
+        'size_width', 'size_length', 'size_weight', 'cost'
+    ];
+    
     const updates = req.body;
+    const updateKeys = Object.keys(updates);
+    
+    // Фильтруем только разрешенные поля
+    const filteredUpdates = updateKeys.filter((key) => allowedFields.includes(key));
+    if (filteredUpdates.length === 0) {
+        return res.status(400).json({ error: 'No valid fields to update' });
+    }
 
     try {
-        const updateKeys = Object.keys(updates).map(key => `${key} = ?`).join(', ');
         const updateValues = Object.values(updates);
 
         await db.execute(
@@ -80,6 +173,17 @@ router.delete('/:tracking_number', authMiddleware, roleMiddleware('admin'), asyn
     const { tracking_number } = req.params;
     try {
         await db.execute('UPDATE packages SET is_deleted = 1 WHERE tracking_number = ?', [tracking_number]);
+        res.json({ message: 'Package deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Удаление посылки (только admin)
+router.delete('/:tracking_number/permanent', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+    const { tracking_number } = req.params;
+    try {
+        await db.execute('DELETe FROM packages WHERE tracking_number = ?', [tracking_number]);
         res.json({ message: 'Package deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });

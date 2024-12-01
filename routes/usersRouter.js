@@ -69,7 +69,7 @@ router.get('/refreshToken', authMiddleware, async (req, res) => {
 // Получение списка пользователей (только admin)
 router.get('/', authMiddleware, roleMiddleware('admin'), async (req, res) => {
     try {
-        const [rows] = await db.execute('SELECT id, first_name, last_name, username, role FROM users WHERE is_deleted = 0');
+        const [rows] = await db.execute('SELECT id, first_name, last_name, username, address, role FROM users WHERE is_deleted = 0');
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -189,6 +189,8 @@ router.patch('/password/:id', authMiddleware, async (req, res) => {
 // Удаление пользователя (мягкое удаление, только admin)
 router.delete('/:id', authMiddleware, roleMiddleware('admin'), async (req, res) => {
     const { id } = req.params;
+    if(id == req.user.id) return res.status(400).json({ error: 'You can not delete your account' });
+
     try {
         await db.execute('UPDATE users SET is_deleted = 1 WHERE id = ?', [id]);
         res.json({ message: 'User deleted successfully' });
@@ -200,6 +202,8 @@ router.delete('/:id', authMiddleware, roleMiddleware('admin'), async (req, res) 
 // Удаление пользователя
 router.delete('/:id/permanent', authMiddleware, roleMiddleware('admin'), async (req, res) => {
     const { id } = req.params;
+    if(id == req.user.id) return res.status(400).json({ error: 'You can not delete your account' });
+    
     try {
         await db.execute('DELETE FROM users WHERE id = ?', [id]);
         res.json({ message: 'User deleted successfully' });
