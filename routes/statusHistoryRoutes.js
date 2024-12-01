@@ -51,6 +51,8 @@ router.get('/:tracking_number', authMiddleware, async (req, res) => {
             `;
             params.push(req.user.id, req.user.id);
         }
+        
+        query += 'ORDER BY recorded_at ASC';
 
         const [rows] = await db.execute(query, params);
 

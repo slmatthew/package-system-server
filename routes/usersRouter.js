@@ -161,14 +161,14 @@ router.patch('/password/:id', authMiddleware, async (req, res) => {
 
     try {
         // Проверим, существует ли пользователь с таким id
-        const [user] = await db.execute('SELECT id FROM users WHERE id = ?', [userId]);
+        const [user] = await db.execute('SELECT * FROM users WHERE id = ?', [userId]);
 
         if (user.length === 0) {
             return res.status(404).json({ error: 'User not found.' });
         }
 
-        if(userId === req.user.id) {
-            const isMatch = await bcrypt.compare(old_password, user.password);
+        if(userId == req.user.id) {
+            const isMatch = await bcrypt.compare(old_password, user[0].password);
             if(!isMatch) {
                 return res.status(401).json({ error: 'Old password is incorrect.' });
             }

@@ -102,6 +102,7 @@ router.get('/my', authMiddleware, async (req, res) => {
             LEFT JOIN users receiver ON p.receiver_id = receiver.id
             LEFT JOIN package_types pt ON p.type_id = pt.id
             WHERE (p.sender_id = ? OR p.receiver_id = ?) AND p.is_deleted = 0
+            ORDER BY created_at DESC
         `;
 
         const [rows] = await db.execute(query, [req.user.id, req.user.id]);
