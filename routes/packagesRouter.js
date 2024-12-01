@@ -15,7 +15,7 @@ const router = express.Router();
 //     }
 // });
 
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, roleMiddleware('sorter'), async (req, res) => {
     const { search, type } = req.query;
 
     try {
