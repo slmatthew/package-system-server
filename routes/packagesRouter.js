@@ -125,6 +125,8 @@ router.post('/', authMiddleware, async (req, res) => {
         size_width, size_length, size_weight, cost
     } = req.body;
 
+    if(req.user.role === 'user' && sender_id !== req.user.id) return res.status(400).json({ error: 'Invalid sender_id' });
+
     try {
         await db.execute(
             `INSERT INTO packages 
@@ -132,7 +134,7 @@ router.post('/', authMiddleware, async (req, res) => {
             VALUES (?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, ?)`,
             [tracking_number, sender_id, receiver_id, type_id, size_width, size_length, size_weight, cost]
         );
-        res.status(201).json({ message: 'Package created successfully' });
+        res.status(201).json({ message: 'Package created successfully', tracking_number });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
