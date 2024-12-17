@@ -127,8 +127,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: 'Invalid keys in the update request.' });
         }
         
-        if(req.user.role !== 'admin' && role && req.user.role !== updates.role) {
-            return res.status(403).json({ error: 'You can not edit your role.' });
+        if(req.user.role !== 'admin' && req.user.role !== updates.role) {
+            //return res.status(403).json({ error: 'You can not edit your role.' });
+            updates.role = req.user.role;
         }
         
         const updateValues = updateKeys.map(key => updates[key]);
