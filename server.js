@@ -12,6 +12,7 @@ const packageTypeRoutes   = require('./routes/packageTypesRoutes');
 const packageStatusRoutes = require('./routes/packageStatusesRoutes');
 const facilityRoutes      = require('./routes/facilitiesRoutes');
 const statusHistoryRoutes = require('./routes/statusHistoryRoutes');
+const excelRoutes         = require('./routes/excelRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ app.use('/api/package-types', packageTypeRoutes);
 app.use('/api/package-statuses', packageStatusRoutes);
 app.use('/api/facilities', facilityRoutes);
 app.use('/api/status-history', statusHistoryRoutes);
+app.use('/api/export', excelRoutes);
 
 // Обработка ошибок для несуществующих маршрутов
 app.use((req, res) => {
